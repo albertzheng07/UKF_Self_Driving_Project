@@ -59,8 +59,7 @@ UKF::UKF() {
   Hint: one or more values initialized above might be wildly off...
   */
 
-  Xsig_pred_ = MatrixXd(5, 2*7+1);
-
+  Xsig_pred_ = MatrixXd(5, 2*5+1);
 
   ///* Weights of sigma points
   weights_ = VectorXd(2*7+1);
@@ -88,15 +87,43 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   Complete this function! Make sure you switch between lidar and radar
   measurements.
   */
-  if (meas_package.sensor_type_ == MeasurementPackage::LASER)
+  if (!is_initialized_) {
+    if (meas_package.sensor_type_ == MeasurementPackage::RADAR)
+    {
+      /**
+      Convert radar from polar to cartesian coordinates and initialize state matrix.
+      */
+      /* Initialize state vector */
+
+      double rho     = meas_package.raw_measurements_[0]; // radial distance to object
+      double phi     = meas_package.raw_measurements_[1]; // bearing angle between object and vehicle current heading
+      double rho_dot = meas_package.raw_measurements_[2]; // radial velocity to object
+      x_ << rho*cos(phi), rho*sin(phi), rho_dot*cos(phi), rho_dot*sin(phi); // convert polar to cartesian x = rho*cos(phi), y = rho*sin(phi), assume vx, vy without phidot measurement
+      
+    }
+    else if(meas_package.sensor_type_ == MeasurementPackage::LASER)
+    {
+      /**
+      Initialize state vector
+      */
+      x_ <<  meas_package.raw_measurements_[0], meas_package.raw_measurements_[1], 0, 0; // x,y distances to object (directly in cartesian coord.)  
+    }
+  /* Initialize state process covariance matrix */
+  for (uint8_t i = 0; i < n_x_; i++)
   {
+    P_(i,i) = 1;
+  }  
+  MatrixXd A = P_.llt().matrixL();
 
-  }
-  else if(meas_package.sensor_type_ == MeasurementPackage::RADAR)
+  /* Generate initial sigma pts */
+  double c = sqrt(lambda_+n_x_);
+  for (int i = 0; i < 2*n_x_+1; i++)
   {
-
+    Xsig_pred_.col(i) = x_;
   }
-
+  Xsig_pred_.block(0,1,n_x_,n_x_) += c*A;
+  Xsig_pred_.block(0,n_x_+1, n_x_+1, 2*n_x_+1) -= c*A;
+  }
 }
 
 static VectorXd processModel(const VectorXd& Xaug, double dt)
