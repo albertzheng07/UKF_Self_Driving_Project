@@ -124,16 +124,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   {
     P_(i,i) = 1;
   }  
-  MatrixXd A = P_.llt().matrixL();
-
-  /* Generate initial sigma pts */
-  double c = sqrt(lambda_+n_x_);
-  for (int i = 0; i < 2*n_x_+1; i++)
-  {
-    Xsig_pred_.col(i) = x_;
-  }
-  Xsig_pred_.block(0,1,n_x_,n_x_) += c*A;
-  Xsig_pred_.block(0,n_x_+1, n_x_+1, 2*n_x_+1) -= c*A;
+  GenerateSigmaPoints(&Xsig_pred_);
 
   }
   else // Run if already initialized
@@ -147,9 +138,42 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     {
       use_laser_ = true;
       R_ = R_Laser_;
-    } 
+    }
+
+    GenerateSigmaPoints(&Xsig_pred_);
+
+    //create augmented mean vector
+    VectorXd x_aug = VectorXd(n_aug_);
+
+    //create augmented state covariance
+    MatrixXd P_aug = MatrixXd(n_aug_, n_aug_);
+
+    //create sigma point matrix
+    MatrixXd Xsig_aug = MatrixXd(n_aug_, 2 * n_aug_ + 1); 
+
+    /* Generate Augmented sigma points from state vector, sigma points, and covariance matrix */
+    AugmentedSigmaPoints(&x_aug, &Xsig_aug, &P_aug);
   }
 }
+
+void UKF::GenerateSigmaPoints(MatrixXd* pXsig)
+{
+  VectorXd Xsig = *pXsig; // copy deference for ease of use;
+
+  MatrixXd A = P_.llt().matrixL();
+ 
+   /* Generates sigma pts */
+  double c = sqrt(lambda_+n_x_);
+  for (int i = 0; i < 2*n_x_+1; i++)
+  {
+    Xsig.col(i) = x_;
+  }
+  Xsig.block(0,1,n_x_,n_x_) += c*A;
+  Xsig.block(0,n_x_+1, n_x_+1, 2*n_x_+1) -= c*A;
+
+  *pXsig = Xsig;
+}
+
 
 /* Helper function which defines the process model using the augmented state vector */
 static VectorXd processModel(const VectorXd& Xaug, double dt)
@@ -173,16 +197,11 @@ static VectorXd processModel(const VectorXd& Xaug, double dt)
 }
 
 /* Helper function which creates the augmented state vector, sigma points and covariance matrix  */
-void UKF::AugmentedSigmaPoints(VectorXd* x_aug_out, MatrixXd* Xsig_out, MatrixXd* P_aug_out)
+void UKF::AugmentedSigmaPoints(VectorXd* pX_aug, MatrixXd* pXsig_aug, MatrixXd* pP_aug)
 {
-  //create augmented mean vector
-  VectorXd x_aug = VectorXd(n_aug_);
-
-  //create augmented state covariance
-  MatrixXd P_aug = MatrixXd(n_aug_, n_aug_);
-
-  //create sigma point matrix
-  MatrixXd Xsig_aug = MatrixXd(n_aug_, 2 * n_aug_ + 1);
+  VectorXd x_aug = *pX_aug; // copy deference for ease of use;
+  MatrixXd Xsig_aug = *pXsig_aug; // copy deference for ease of use;
+  MatrixXd P_aug = *pP_aug; // copy deference for ease of use;
 
   //create augmented mean state
   for (int i = 0; i < n_x_; i++)
@@ -194,7 +213,7 @@ void UKF::AugmentedSigmaPoints(VectorXd* x_aug_out, MatrixXd* Xsig_out, MatrixXd
  
    //create augmented covariance matrix
   P_aug.block(0,0,n_x_,n_x_) = P_;
- 
+
   P_aug(5,5) = std_a_*std_a_;
   P_aug(6,6) = std_yawdd_*std_yawdd_;
 
@@ -210,11 +229,11 @@ void UKF::AugmentedSigmaPoints(VectorXd* x_aug_out, MatrixXd* Xsig_out, MatrixXd
   {
     Xsig_aug.col(i+1)     = x_aug + sqrt(lambda_+n_aug_) * A.col(i);
     Xsig_aug.col(i+1+n_aug_) = x_aug - sqrt(lambda_+n_aug_) * A.col(i);
-  }
+  }  
 
-  *Xsig_out = Xsig_aug;
-  *x_aug_out = x_aug;
-  *P_aug_out = P_aug;  
+  *pX_aug = x_aug;
+  *pXsig_aug = Xsig_aug;
+  *pP_aug = P_aug;
 }
 
 /**

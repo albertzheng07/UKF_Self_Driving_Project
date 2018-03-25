@@ -111,7 +111,15 @@ public:
    */
   void UpdateRadar(MeasurementPackage meas_package);
 
-  void AugmentedSigmaPoints(VectorXd* x_aug_out, MatrixXd* Xsig_out, MatrixXd* P_aug_out);
+  /* 
+  * Generates Sigma points from current state vector 
+  */
+  void GenerateSigmaPoints(MatrixXd* Xsig);
+
+  /* 
+  * Generates Augmented Sigma points from current state vector, state sigma points and state covariance matrix 
+  */
+  void AugmentedSigmaPoints(VectorXd* x_aug, MatrixXd* Xsig_aug, MatrixXd* P_aug);
 
   /* Tools instance lives here */
   Tools tools;
