@@ -65,6 +65,10 @@ public:
   ///* Augmented state dimension
   int n_aug_;
 
+  int n_z_laser_;
+
+  int n_z_radar_;
+
   ///* Sigma point spreading parameter
   double lambda_;
 
@@ -74,7 +78,7 @@ public:
   ///* R Laser Noise Matrix
   MatrixXd R_Laser_;
 
-  MatrixXd R_;
+  double previous_timestamp_;
 
   /**
    * Constructor
@@ -99,17 +103,18 @@ public:
    */
   void Prediction(double delta_t);
 
-  /**
-   * Updates the state and the state covariance matrix using a laser measurement
-   * @param meas_package The measurement at k+1
-   */
-  void UpdateLidar(MeasurementPackage meas_package);
+  // *
+  //  * Updates the predicted measurement, measurement sigma points and measurement noise matrix using either the laser or radar measurement
+  //  * @param meas_package The measurement at k+1
+  void UpdateMeasurement(MeasurementPackage meas_package);
 
-  /**
-   * Updates the state and the state covariance matrix using a radar measurement
-   * @param meas_package The measurement at k+1
-   */
-  void UpdateRadar(MeasurementPackage meas_package);
+  // *
+  //  * Updates the state and the state covariance matrix using either the laser or radar measurement
+  //  * @param meas_package The measurement at k+1
+  //  * @param zpred The predicted measurement at k+1
+  //  * @param Zsig The predicted measurement sigma points at k+1
+  //  * @param S The predicted measurement noise matrix at k+1
+  void UpdateState(MeasurementPackage meas_package, VectorXd zpred, MatrixXd Zsig, MatrixXd S);
 
   /* 
   * Generates Sigma points from current state vector 
@@ -120,6 +125,7 @@ public:
   * Generates Augmented Sigma points from current state vector, state sigma points and state covariance matrix 
   */
   void AugmentedSigmaPoints(VectorXd* x_aug, MatrixXd* Xsig_aug, MatrixXd* P_aug);
+
 
   /* Tools instance lives here */
   Tools tools;
