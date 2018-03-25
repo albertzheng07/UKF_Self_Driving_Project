@@ -72,6 +72,20 @@ UKF::UKF() {
 
   ///* Sigma point spreading parameter
   lambda_ = 3.0;
+
+  Q_ = MatrixXd(2,2);
+  Q_ << std_a_*std_a_, 0 , 
+              0, std_yawdd_*std_yawdd_;    
+
+  ///* Measurement Noise Matrices
+  MatrixXd R_Radar_(3,3);
+  R_Radar_ << std_radr_*std_radr_, 0 ,0, 
+              0, std_radphi_*std_radphi_, 0, 
+              0, 0, std_radrd_;
+
+  MatrixXd R_Laser_(2,2);
+  R_Laser_ << std_laspx_*std_laspx_, 0 , 
+              0, std_laspy_*std_laspy_;             
 }
 
 UKF::~UKF() {}
@@ -99,7 +113,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       double phi     = meas_package.raw_measurements_[1]; // bearing angle between object and vehicle current heading
       double rho_dot = meas_package.raw_measurements_[2]; // radial velocity to object
       x_ << rho*cos(phi), rho*sin(phi), rho_dot*cos(phi), rho_dot*sin(phi); // convert polar to cartesian x = rho*cos(phi), y = rho*sin(phi), assume vx, vy without phidot measurement
-      
+      R_ = R_Radar_;
     }
     else if(meas_package.sensor_type_ == MeasurementPackage::LASER)
     {
@@ -107,6 +121,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       Initialize state vector
       */
       x_ <<  meas_package.raw_measurements_[0], meas_package.raw_measurements_[1], 0, 0; // x,y distances to object (directly in cartesian coord.)  
+      R_ = R_Laser_;
     }
   /* Initialize state process covariance matrix */
   for (uint8_t i = 0; i < n_x_; i++)
@@ -123,6 +138,20 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   }
   Xsig_pred_.block(0,1,n_x_,n_x_) += c*A;
   Xsig_pred_.block(0,n_x_+1, n_x_+1, 2*n_x_+1) -= c*A;
+
+  }
+  else // Run if already initialized
+  {
+    if (meas_package.sensor_type_ == MeasurementPackage::RADAR)
+    {
+      use_radar_ = true;
+      R_ = R_Radar_;
+    }
+    else if (meas_package.sensor_type_ == MeasurementPackage::LASER) 
+    {
+      use_laser_ = true;
+      R_ = R_Laser_;
+    } 
   }
 }
 
