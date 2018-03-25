@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include "tools.h"
 
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
@@ -67,9 +68,6 @@ public:
   ///* Sigma point spreading parameter
   double lambda_;
 
-  ///* Q State Noise Matrix
-  MatrixXd Q_;
-
   ///* R Radar Noise Matrix
   MatrixXd R_Radar_;
 
@@ -82,7 +80,6 @@ public:
    * Constructor
    */
   UKF();
-
 
   /**
    * Destructor
@@ -113,6 +110,11 @@ public:
    * @param meas_package The measurement at k+1
    */
   void UpdateRadar(MeasurementPackage meas_package);
+
+  void AugmentedSigmaPoints(MatrixXd* Xsig_out);
+
+  /* Tools instance lives here */
+  Tools tools;
 
 };
 

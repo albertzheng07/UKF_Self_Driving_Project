@@ -72,11 +72,7 @@ UKF::UKF() {
 
   ///* Sigma point spreading parameter
   lambda_ = 3.0;
-
-  Q_ = MatrixXd(2,2);
-  Q_ << std_a_*std_a_, 0 , 
-              0, std_yawdd_*std_yawdd_;    
-
+  
   ///* Measurement Noise Matrices
   MatrixXd R_Radar_(3,3);
   R_Radar_ << std_radr_*std_radr_, 0 ,0, 
@@ -175,6 +171,32 @@ static VectorXd processModel(const VectorXd& Xaug, double dt)
     return xk;
 }
 
+void UKF::AugmentedSigmaPoints(MatrixXd* Xsig_out)
+{
+  //create augmented mean vector
+  VectorXd x_aug = VectorXd(n_aug_);
+
+  //create augmented state covariance
+  MatrixXd P_aug = MatrixXd(n_aug_, n_aug_);
+
+  //create sigma point matrix
+  MatrixXd Xsig_aug = MatrixXd(n_aug_, 2 * n_aug_ + 1);
+
+  //create augmented mean state
+  for (int i = 0; i < n_x_; i++)
+  { 
+     x_aug(i) = x_(i); 
+  }
+  x_aug(5) = 0;
+  x_aug(6) = 0;
+ 
+   //create augmented covariance matrix
+  P_aug.block(0,0,n_x_,n_x_) = P_;
+ 
+  P_aug(5,5) = std_a_*std_a_;
+  P_aug(6,6) = std_yawdd_*std_yawdd_;
+
+}
 
 /**
  * Predicts sigma points, the state, and the state covariance matrix.
