@@ -151,6 +151,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   }
 }
 
+/* Helper function which defines the process model using the augmented state vector */
 static VectorXd processModel(const VectorXd& Xaug, double dt)
 {
     VectorXd xk(5);
@@ -171,7 +172,8 @@ static VectorXd processModel(const VectorXd& Xaug, double dt)
     return xk;
 }
 
-void UKF::AugmentedSigmaPoints(MatrixXd* Xsig_out)
+/* Helper function which creates the augmented state vector, sigma points and covariance matrix  */
+void UKF::AugmentedSigmaPoints(VectorXd* x_aug_out, MatrixXd* Xsig_out, MatrixXd* P_aug_out)
 {
   //create augmented mean vector
   VectorXd x_aug = VectorXd(n_aug_);
@@ -196,6 +198,23 @@ void UKF::AugmentedSigmaPoints(MatrixXd* Xsig_out)
   P_aug(5,5) = std_a_*std_a_;
   P_aug(6,6) = std_yawdd_*std_yawdd_;
 
+  //calculate square root of P_aug
+  MatrixXd A = P_aug.llt().matrixL();
+  
+  //create augmented sigma points
+  //set first column of sigma point matrix
+  Xsig_aug.col(0)  = x_aug;
+
+  //set remaining sigma points
+  for (int i = 0; i < n_aug_; i++)
+  {
+    Xsig_aug.col(i+1)     = x_aug + sqrt(lambda_+n_aug_) * A.col(i);
+    Xsig_aug.col(i+1+n_aug_) = x_aug - sqrt(lambda_+n_aug_) * A.col(i);
+  }
+
+  *Xsig_out = Xsig_aug;
+  *x_aug_out = x_aug;
+  *P_aug_out = P_aug;  
 }
 
 /**

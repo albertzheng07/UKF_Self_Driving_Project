@@ -111,7 +111,7 @@ public:
    */
   void UpdateRadar(MeasurementPackage meas_package);
 
-  void AugmentedSigmaPoints(MatrixXd* Xsig_out);
+  void AugmentedSigmaPoints(VectorXd* x_aug_out, MatrixXd* Xsig_out, MatrixXd* P_aug_out);
 
   /* Tools instance lives here */
   Tools tools;
