@@ -34,10 +34,10 @@ UKF::UKF() {
   P_ = MatrixXd(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 1;
+  std_a_ = 0.005;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 0.1;
+  std_yawdd_ = 0.001;
   
   //DO NOT MODIFY measurement noise values below these are provided by the sensor manufacturer.
   // Laser measurement noise standard deviation position1 in m
@@ -64,7 +64,7 @@ UKF::UKF() {
   Hint: one or more values initialized above might be wildly off...
   */
 
-  Xsig_pred_ = MatrixXd(5, 2*5+1);
+  Xsig_pred_ = MatrixXd(5, 2*7+1);
 
   ///* Weights of sigma points
   weights_ = VectorXd(2*7+1);
@@ -85,12 +85,12 @@ UKF::UKF() {
   lambda_ = 3.0;
   
   ///* Measurement Noise Matrices
-  MatrixXd R_Radar_(3,3);
+  R_Radar_ = MatrixXd(3,3);
   R_Radar_ << std_radr_*std_radr_, 0 ,0, 
               0, std_radphi_*std_radphi_, 0, 
-              0, 0, std_radrd_;
+              0, 0, std_radrd_*std_radrd_;
 
-  MatrixXd R_Laser_(2,2);
+  R_Laser_ = MatrixXd(2,2);
   R_Laser_ << std_laspx_*std_laspx_, 0 , 
               0, std_laspy_*std_laspy_;             
 }
@@ -120,6 +120,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       double phi     = meas_package.raw_measurements_[1]; // bearing angle between object and vehicle current heading
       double rho_dot = meas_package.raw_measurements_[2]; // radial velocity to object
       x_ << rho*cos(phi), rho*sin(phi), rho_dot*cos(phi), rho_dot*sin(phi), 0; // convert polar to cartesian x = rho*cos(phi), y = rho*sin(phi), assume vx, vy without phidot measurement
+      use_radar_ = false;      
     }
     else if(meas_package.sensor_type_ == MeasurementPackage::LASER)
     {
@@ -127,6 +128,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       Initialize state vector
       */
       x_ <<  meas_package.raw_measurements_[0], meas_package.raw_measurements_[1], 0, 0, 0; // x,y distances to object (directly in cartesian coord.)  
+      use_radar_ = false;      
     }
   /* Initialize state process covariance matrix */
   for (uint8_t i = 0; i < n_x_; i++)
@@ -146,17 +148,24 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   /* Initialize Sigma Points */
   GenerateSigmaPoints(&Xsig_pred_);
 
+  is_initialized_ = true;
+  previous_timestamp_ = meas_package.timestamp_;
+
   }
   else // Run if already initialized
   {
     if (meas_package.sensor_type_ == MeasurementPackage::RADAR)
     {
       use_radar_ = true;
+      use_laser_ = false;      
     }
     else if (meas_package.sensor_type_ == MeasurementPackage::LASER) 
     {
+      use_radar_ = false;      
       use_laser_ = true;
     }
+
+   cout << "measurement stamp = " << meas_package.timestamp_  << "\n";
 
     double dt = (meas_package.timestamp_ - previous_timestamp_) / 1000000.0; //dt - expressed in seconds
     previous_timestamp_ = meas_package.timestamp_;
@@ -199,11 +208,21 @@ static VectorXd processModel(const VectorXd& Xaug, double dt)
     double psidot = Xaug(4);
     double nu_accel = Xaug(5);
     double nu_psidd = Xaug(6);
-    
-    xk(0) = Xaug(0) + v/max(psidot,0.0001)*(sin(psi+psidot*dt)-sin(psi)) + 0.5*dt*dt*cos(psi)*nu_accel;
-    xk(1) = Xaug(1) + v/max(psidot,0.0001)*(-cos(psi+psidot*dt)+cos(psi)) + 0.5*dt*dt*sin(psi)*nu_accel;
+    xk(0) = Xaug(0);
+    xk(1) = Xaug(1);   
+    xk(3) = Xaug(3); 
+
+    if (fabs(psidot) > 0.001)
+    {
+      xk(0) += v/psidot*(sin(psi+psidot*dt)-sin(psi));
+      xk(1) += v/psidot*(-cos(psi+psidot*dt)+cos(psi));
+      xk(3) += psidot*dt + 0.5*dt*dt*nu_psidd;
+    }
+
+    xk(0) += 0.5*dt*dt*cos(psi)*nu_accel;
+    xk(1) += 0.5*dt*dt*sin(psi)*nu_accel;
     xk(2) = Xaug(2) + dt*nu_accel;
-    xk(3) = Xaug(3) + psidot*dt + 0.5*dt*dt*nu_psidd;
+    xk(3) += 0.5*dt*dt*nu_psidd;      
     xk(4) = Xaug(4) + dt*nu_psidd;
     
     return xk;
@@ -337,7 +356,7 @@ void UKF::UpdateState(MeasurementPackage meas_package, VectorXd z_pred, MatrixXd
     n_z_ = n_z_laser_;
   }
  
-  VectorXd z_meas(n_z_);
+  VectorXd z_meas(n_z_);  
   if (use_radar_)
   {
     z_meas(0) = meas_package.raw_measurements_[0]; // radial distance to object
@@ -350,8 +369,13 @@ void UKF::UpdateState(MeasurementPackage meas_package, VectorXd z_pred, MatrixXd
     z_meas(1) = meas_package.raw_measurements_[1]; // position y to object
   }
 
+
   MatrixXd Tc(n_x_, n_z_);
   Tc.fill(0.0);
+
+  // cout << "Xsig_pred_ = " << Xsig_pred_ << "\n";
+  // cout << "Zsig = " << Zsig << "\n";
+
 
   //calculate cross correlation matrix
   for (int i = 0; i < 2*n_aug_+1; i++)
@@ -363,8 +387,14 @@ void UKF::UpdateState(MeasurementPackage meas_package, VectorXd z_pred, MatrixXd
       {       
         z_diff(1) = tools.unWrapAngle(z_diff(1));
       }
+      // cout << i << " x_diff = " << x_diff << "\n";
+      // cout << " z_diff = " << z_diff << "\n";
+
+      // cout << "test = " << weights_(i)*x_diff*z_diff.transpose();
+
       Tc += weights_(i)*x_diff*z_diff.transpose();
   }
+
   //calculate Kalman gain K;
   MatrixXd K = Tc*S.inverse();
   
@@ -406,11 +436,19 @@ void UKF::UpdateMeasurement(MeasurementPackage meas_package)
       Zsig.col(i) = measLidarModel(Xsig_pred_.col(i));
     } 
   }
+
   //calculate mean predicted measurement
   for (int i = 0; i < 2*n_aug_+1; i++)
   {
       z_pred += weights_(i)*Zsig.col(i);
   } 
+
+  // cout << "z_pred = "  << z_pred << " \n";
+  // cout << "weights_ = "  << weights_ << " \n";
+  // cout << "Zsig = "  << Zsig << " \n";
+
+  // cout << "mean predict \n";
+
   //calculate innovation covariance matrix S
   for (int i = 0; i < 2*n_aug_+1; i++)
   {
@@ -421,6 +459,11 @@ void UKF::UpdateMeasurement(MeasurementPackage meas_package)
       }
       S += weights_(i)*error*error.transpose();        
   }
+  // cout << "z_pred = "  << z_pred << " \n";
+  // cout << "weights_ = "  << weights_ << " \n";
+
+
+  // cout << "test \n";
 
   if (use_radar_)
   {
@@ -430,6 +473,9 @@ void UKF::UpdateMeasurement(MeasurementPackage meas_package)
   {
     S += R_Laser_;
   }
+
+
+  // cout << "use_laser_ = " << use_laser_ << " \n";
 
   UpdateState(meas_package, z_pred, Zsig, S);
 }
