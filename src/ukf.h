@@ -80,6 +80,8 @@ public:
 
   double previous_timestamp_;
 
+  int counter;
+
   /**
    * Constructor
    */
@@ -126,6 +128,8 @@ public:
   */
   void AugmentedSigmaPoints(VectorXd* x_aug, MatrixXd* Xsig_aug, MatrixXd* P_aug);
 
+
+  VectorXd measRadarModel(const VectorXd& x);
 
   /* Tools instance lives here */
   Tools tools;
