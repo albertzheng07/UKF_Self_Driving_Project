@@ -119,16 +119,18 @@ public:
   void UpdateState(MeasurementPackage meas_package, VectorXd zpred, MatrixXd Zsig, MatrixXd S);
 
   /* 
-  * Generates Sigma points from current state vector 
-  */
-  void GenerateSigmaPoints(MatrixXd* Xsig);
-
-  /* 
-  * Generates Augmented Sigma points from current state vector, state sigma points and state covariance matrix 
+  * Generates Augmented Sigma points from state vector, state sigma points and state covariance matrix 
+  
+  //  * @param x_aug predicted augmented state vector
+  //  * @param Xsig_aug predicted augmented state matrix of sigma points
+  //  * @param P_aug predicted augmented state covariance matrix
   */
   void AugmentedSigmaPoints(VectorXd* x_aug, MatrixXd* Xsig_aug, MatrixXd* P_aug);
 
-
+  /* 
+  * Returns measurement Radar Model from current state vector
+  //  * @param x predicted state vector
+  */
   VectorXd measRadarModel(const VectorXd& x);
 
   /* Tools instance lives here */
